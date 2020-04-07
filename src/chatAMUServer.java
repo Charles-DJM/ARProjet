@@ -28,7 +28,7 @@ public class chatAMUServer {
         e.printStackTrace();
       }
     } else {
-      System.out.println("Usage: java EchoServer port");
+      System.out.println("Usage: java chatAMUServer @port");
     }
     return;
   }
@@ -71,11 +71,13 @@ public class chatAMUServer {
       try{
         String buffer = in.readLine();
         if (buffer.split(" ")[0].equals("LOGIN")) {
-          login = buffer.split(" ", 2)[1] + ">";
+          login = buffer.split(" ", 2)[1];
           clientBlockingQueue = new ArrayBlockingQueue<>(512);
           clients.put(login, clientBlockingQueue);
           sender = new ClientSender(socket, out, clientBlockingQueue);
           sender.start();
+
+          System.out.println("New client : " + login);
         }else{
           out.print("ERROR LOGIN aborting chatamu protocol");
           socket.close();
@@ -87,16 +89,22 @@ public class chatAMUServer {
         while(true){
           buffer = in.readLine();
           if(buffer.split(" ")[0].equals("MESSAGE")){
-            System.out.println(login + buffer.split(" ", 2)[1]);
-            dispatchQueue.add(login + buffer.split(" ", 2)[1]);
+            //System.out.println(login + buffer.split(" ", 2)[1]);
+            dispatchQueue.add("MESSAGE "+login + ">"+ buffer.split(" ", 2)[1]);
           }//TODO: logout
         }
 
-      }catch (IOException e){e.printStackTrace();}
+      }catch (Exception e){
+        //Client logout
+        System.out.println(login + " s'est deconnecté");
+        sender.stop = true;
+        return;
+      }
     }
   }
 
   class ClientSender extends Thread{
+    boolean stop = false;
     Socket socket;
     PrintWriter out;
     BlockingQueue<String> clientBlockingQueue;
@@ -109,10 +117,18 @@ public class chatAMUServer {
 
     public void run(){
       try{
+
+        out = new PrintWriter(socket.getOutputStream(), true);
         while(true){
-          out.print(clientBlockingQueue.take());
+          if(stop){
+            return; //Arrete le thread
+          }/*
+          out.println(clientBlockingQueue.take());*/
+
+          String string = clientBlockingQueue.take();
+          out.println(string);
         }
-      }catch (InterruptedException e){
+      }catch (Exception e){
         e.printStackTrace();
         return;
       }
@@ -126,8 +142,8 @@ public class chatAMUServer {
         String sender;
         while (true) {
           string = dispatchQueue.take();
-          System.out.println(string);
           sender = string.split(">")[0];
+          sender = sender.split(" ")[1];
           for (String client : clients.keySet()) {
             if (!client.equals(sender)) {
               clients.get(client).add(string);
