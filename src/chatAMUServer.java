@@ -11,8 +11,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class chatAMUServer {
-
+  //Les clients envoient leur message dans cette queue pour que le dispatcher les envoi aux autres clients
   ArrayBlockingQueue<String> dispatchQueue = new ArrayBlockingQueue<>(512);
+  //Map de tous les clients de leur BlockingQueue pour pouvoir leur envoyer des messages
   Map<String, BlockingQueue<String>> clients = new HashMap<>();
 
   public static void main(String[] args) {
@@ -48,7 +49,12 @@ public class chatAMUServer {
       return;
     }
   }
-
+/*  ClientHandler
+*
+* Gere la connexion d'un client et lui associe un ClientSender
+* Envoi au Dispatcher les messages de ce client via la DispatchQueue
+*
+* */
   class ClientHandler extends Thread{
     Socket socket;
     PrintWriter out;
@@ -73,7 +79,7 @@ public class chatAMUServer {
         if (buffer.split(" ")[0].equals("LOGIN")) {
           login = buffer.split(" ", 2)[1];
           clientBlockingQueue = new ArrayBlockingQueue<>(512);
-          clients.put(login, clientBlockingQueue);
+          clients.put(login, clientBlockingQueue);  //Ajout du client a la liste des clients
           sender = new ClientSender(socket, out, clientBlockingQueue);
           sender.start();
 
@@ -91,18 +97,23 @@ public class chatAMUServer {
           if(buffer.split(" ")[0].equals("MESSAGE")){
             //System.out.println(login + buffer.split(" ", 2)[1]);
             dispatchQueue.add("MESSAGE "+login + ">"+ buffer.split(" ", 2)[1]);
-          }//TODO: logout
+          }
         }
 
       }catch (Exception e){
         //Client logout
-        System.out.println(login + " s'est deconnecté");
+        System.out.println(login + "  s'est déconnecté");
+        dispatchQueue.add("MESSAGE "+login + ">"+ " s'est déconnecté ");
         sender.stop = true;
         return;
       }
     }
   }
-
+/* ClientSender
+*
+* Envoi au client les message des autres clients, qui sont stockés dans clientBlockingQueue
+*
+**/
   class ClientSender extends Thread{
     boolean stop = false;
     Socket socket;
@@ -122,9 +133,7 @@ public class chatAMUServer {
         while(true){
           if(stop){
             return; //Arrete le thread
-          }/*
-          out.println(clientBlockingQueue.take());*/
-
+          }
           String string = clientBlockingQueue.take();
           out.println(string);
         }
@@ -134,7 +143,11 @@ public class chatAMUServer {
       }
     }
   }
-
+/* Dispatcher
+*
+* Prends les message dans la dispatchQueue et les envoie a tous les clients via leur BlockingQueue stocké dans clients
+*
+* */
   class Dispatcher extends Thread{
     public void run(){
       try {
@@ -145,7 +158,7 @@ public class chatAMUServer {
           sender = string.split(">")[0];
           sender = sender.split(" ")[1];
           for (String client : clients.keySet()) {
-            if (!client.equals(sender)) {
+            if (!client.equals(sender)) { //Ne pas renvoyer son message a un client
               clients.get(client).add(string);
             }
           }

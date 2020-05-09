@@ -80,7 +80,6 @@ public class chatAMUClient {
           String recieved;
 
           recieved = in.readLine();
-          System.err.println("recieved = "  + recieved);
           String[] strings = recieved.split(" ", 2);
           if(strings[0].equals("ERROR")){
             System.err.println("An error has occurred: " + strings[1]);
@@ -92,7 +91,6 @@ public class chatAMUClient {
 
         }
       }catch(IOException e){
-        e.printStackTrace();
         System.exit(2);
       }
     }
